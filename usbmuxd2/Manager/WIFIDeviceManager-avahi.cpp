@@ -197,7 +197,7 @@ void avahi_browse_callback(AvahiServiceBrowser *b, AvahiIfIndex interface, Avahi
        devmgr->request_restart();
        return;
    case AVAHI_BROWSER_NEW:
-       debug("(Browser) NEW: service '%s' of type '%s' in domain '%s' interface=%d proto=%d", name, type, domain, interface, protocol);
+       info("(Browser) NEW: service '%s' of type '%s' in domain '%s' interface=%d proto=%d", name, type, domain, interface, protocol);
        /* We ignore the returned resolver object. In the callback
           function we free it. If the server is terminated before
           the callback function is called the server will free
@@ -215,7 +215,7 @@ void avahi_browse_callback(AvahiServiceBrowser *b, AvahiIfIndex interface, Avahi
         break;
    case AVAHI_BROWSER_ALL_FOR_NOW:
    case AVAHI_BROWSER_CACHE_EXHAUSTED:
-       debug("(Browser) %s\n", event == AVAHI_BROWSER_CACHE_EXHAUSTED ? "CACHE_EXHAUSTED" : "ALL_FOR_NOW");
+       info("(Browser) %s\n", event == AVAHI_BROWSER_CACHE_EXHAUSTED ? "CACHE_EXHAUSTED" : "ALL_FOR_NOW");
        break;
    }
 }
@@ -236,9 +236,19 @@ void avahi_resolve_callback(AvahiServiceResolver *r, AvahiIfIndex interface, Ava
             break;
         case AVAHI_RESOLVER_FOUND: {
             // TODO: inform muxer about devices leaving
-            debug("(Resolver) FOUND service '%s' of type '%s' in domain '%s' host='%s' interface=%d proto=%d", name, type, domain, host_name ? host_name : "<null>", interface, protocol);
             avahi_address_snprint(addr, sizeof(addr), address);
             t = avahi_string_list_to_string(txt);
+            info("(Resolver) FOUND service '%s' type='%s' domain='%s' host='%s' addr='%s' port=%u interface=%d protocol=%d flags=0x%x txt='%s'",
+                    name ? name : "<null>",
+                    type ? type : "<null>",
+                    domain ? domain : "<null>",
+                    host_name ? host_name : "<null>",
+                    addr,
+                    port,
+                    interface,
+                    protocol,
+                    flags,
+                    t ? t : "<null>");
             std::string serviceName{name};
             std::string macAddr{serviceName.substr(0,serviceName.find("@"))};
             std::string uuid;

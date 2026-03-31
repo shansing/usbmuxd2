@@ -50,14 +50,15 @@ void usbmuxd_log(enum loglevel level, const char *fmt, ...){
     int err = 0;
     va_list ap;
     char *fs = NULL;
-    
-    
+    FILE *stream = NULL;
+
+
     //don't log if below log level. Note: this is not an error
     cassure(level <= log_level);
-    
+
     cassure(fs = malloc(20 + strlen(fmt)));
-    
-    
+
+
     if(log_syslog) {
         sprintf(fs, "[%d] %s\n", level, fmt);
     } else {
@@ -68,16 +69,18 @@ void usbmuxd_log(enum loglevel level, const char *fmt, ...){
         strftime(fs, 10, "[%H:%M:%S", tp);
         sprintf(fs+9, ".%03d][%d] %s\n", (int)(ts.tv_usec / 1000), level, fmt);
     }
-    
+
     va_start(ap, fmt);
     if (log_syslog) {
         vsyslog(level_to_syslog_level(level), fs, ap);
     }else{
-        vfprintf((level > LL_WARNING) ? stdout : stderr, fs,ap);
+        stream = (level > LL_WARNING) ? stdout : stderr;
+        vfprintf(stream, fs,ap);
+        fflush(stream);
     }
     va_end(ap);
-    
-    
+
+
 error:
     safeFree(fs);
     return;
