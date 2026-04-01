@@ -13,6 +13,7 @@
 #include <libimobiledevice/heartbeat.h>
 
 #include <iostream>
+#include <atomic>
 #include <memory>
 #include <mutex>
 #include <vector>
@@ -20,16 +21,25 @@
 class WIFIDeviceManager;
 class WIFIConnectionSession;
 class WIFIDevice : public Device {
+    struct DiscoveryInfo {
+        std::vector<std::string> ipaddr;
+        std::string serviceName;
+        uint32_t interfaceIndex;
+        uint64_t version;
+    };
+
     WIFIDeviceManager *_parent;
     std::weak_ptr<WIFIDevice> _selfref;
     std::vector<std::string> _ipaddr;
     std::string _serviceName;
     uint32_t _interfaceIndex;
+    std::atomic<uint64_t> _discoveryVersion;
     std::shared_ptr<WIFIConnectionSession> _session;
-    std::mutex _sessionLck;
+    mutable std::mutex _sessionLck;
     bool _rediscoverOnDestruct;
 
     bool isPairingDevice() const noexcept;
+    DiscoveryInfo snapshotDiscoveryInfo() const;
 
 public:
     WIFIDevice(Muxer *mux, WIFIDeviceManager *parent, std::string uuid, std::vector<std::string> ipaddr, std::string serviceName, uint32_t interfaceIndex = 0);

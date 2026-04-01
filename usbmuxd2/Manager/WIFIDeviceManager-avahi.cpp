@@ -270,7 +270,7 @@ void avahi_resolve_callback(AvahiServiceResolver *r, AvahiIfIndex interface, Ava
                 try{
                     uuid = sysconf_udid_for_macaddr(macAddr);
                 }catch (tihmstar::exception &e){
-                    debug("failed to find uuid for mac=%s with error=%d (%s)",macAddr.c_str(),e.code(),e.what());
+                    warning("failed to find uuid for mac=%s with error=%d (%s)",macAddr.c_str(),e.code(),e.what());
                     break;
                 }
 

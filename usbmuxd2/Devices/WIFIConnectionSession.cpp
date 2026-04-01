@@ -22,6 +22,9 @@ WIFIConnectionSession::WIFIConnectionSession(std::shared_ptr<WIFIDevice> device)
 , _worker()
 , _stopRequested(false)
 , _started(false)
+, _reconnectRequested(false)
+, _pendingDiscoveryVersion(0)
+, _appliedDiscoveryVersion(0)
 , _state(State::Idle)
 , _idev(nullptr)
 , _hbclient(nullptr)
@@ -54,10 +57,16 @@ std::chrono::milliseconds WIFIConnectionSession::nextBackoff(size_t &idx) const 
 
 bool WIFIConnectionSession::runAttempt(std::shared_ptr<WIFIDevice> dev) noexcept{
     heartbeat_error_t hret = HEARTBEAT_E_SUCCESS;
+    auto discoveryInfo = dev->snapshotDiscoveryInfo();
+    _appliedDiscoveryVersion = discoveryInfo.version;
+    _reconnectRequested = false;
 
     cleanupConnection();
 
-    warning("[WIFIConnectionSession] starting connection attempt serial=%s service=%s", dev->_serial, dev->_serviceName.c_str());
+    warning("[WIFIConnectionSession] starting connection attempt serial=%s service=%s discoveryVersion=%llu",
+            dev->_serial,
+            discoveryInfo.serviceName.c_str(),
+            (unsigned long long)discoveryInfo.version);
     try {
         assure(!idevice_new_with_options(&_idev, dev->_serial, IDEVICE_LOOKUP_NETWORK));
     } catch (tihmstar::exception &e) {
@@ -97,6 +106,13 @@ void WIFIConnectionSession::runloop() noexcept{
             assure(hbrsp = plist_new_dict());
             plist_dict_set_item(hbrsp, "Command", plist_new_string("Polo"));
             while (!_stopRequested) {
+                if (_pendingDiscoveryVersion.load() != _appliedDiscoveryVersion || _reconnectRequested.load()) {
+                    warning("[WIFIConnectionSession] discovery update requires reconnect serial=%s pendingVersion=%llu appliedVersion=%llu",
+                            dev->_serial,
+                            (unsigned long long)_pendingDiscoveryVersion.load(),
+                            (unsigned long long)_appliedDiscoveryVersion);
+                    break;
+                }
                 heartbeat_error_t hret = heartbeat_receive_with_timeout(_hbclient, &hbeat, 15000);
                 if (hret != HEARTBEAT_E_SUCCESS) {
                     if (sleepyTimeReceived) {
@@ -132,13 +148,24 @@ void WIFIConnectionSession::runloop() noexcept{
                 break;
             }
 
+            if (_reconnectRequested.exchange(false) || _pendingDiscoveryVersion.load() != _appliedDiscoveryVersion) {
+                warning("[WIFIConnectionSession] reconnecting immediately after discovery change serial=%s pendingVersion=%llu appliedVersion=%llu",
+                        dev->_serial,
+                        (unsigned long long)_pendingDiscoveryVersion.load(),
+                        (unsigned long long)_appliedDiscoveryVersion);
+                continue;
+            }
+
             // Device entered sleep normally: skip kill/backoff, wait then reconnect
             if (sleepyTimeReceived) {
                 _state = State::Retrying;
                 static constexpr auto sleepReconnectDelay = std::chrono::seconds(60);
                 warning("[WIFIConnectionSession] device entered sleep, waiting %llds before reconnect serial=%s",
                         (long long)std::chrono::duration_cast<std::chrono::seconds>(sleepReconnectDelay).count(), dev->_serial);
-                std::this_thread::sleep_for(sleepReconnectDelay);
+                std::unique_lock<std::mutex> ul(_wakeLck);
+                _wakeCv.wait_for(ul, sleepReconnectDelay, [this]{
+                    return _stopRequested.load() || _reconnectRequested.load() || _pendingDiscoveryVersion.load() != _appliedDiscoveryVersion;
+                });
                 continue;
             }
 
@@ -161,7 +188,10 @@ void WIFIConnectionSession::runloop() noexcept{
         _state = State::Retrying;
         auto delay = nextBackoff(backoffIdx);
         warning("[WIFIConnectionSession] retrying wifi session serial=%s in %lld ms", dev->_serial, (long long)delay.count());
-        std::this_thread::sleep_for(delay);
+        std::unique_lock<std::mutex> ul(_wakeLck);
+        _wakeCv.wait_for(ul, delay, [this]{
+            return _stopRequested.load() || _reconnectRequested.load() || _pendingDiscoveryVersion.load() != _appliedDiscoveryVersion;
+        });
     }
     } catch (tihmstar::exception &e) {
         error("[WIFIConnectionSession] session thread aborted with error=%d (%s)", e.code(), e.what());
@@ -174,24 +204,41 @@ void WIFIConnectionSession::runloop() noexcept{
 
 void WIFIConnectionSession::start(){
     if (_worker.joinable()) {
+        if (_started.load()) {
+            return;
+        }
         _worker.join();
     }
     bool expected = false;
     if (!_started.compare_exchange_strong(expected, true)) {
         return;
     }
+    if (auto dev = _device.lock()) {
+        _pendingDiscoveryVersion = dev->snapshotDiscoveryInfo().version;
+        _appliedDiscoveryVersion = _pendingDiscoveryVersion.load();
+    }
     _stopRequested = false;
+    _reconnectRequested = false;
     _worker = std::thread([this]{ runloop(); });
 }
 
 void WIFIConnectionSession::stop(bool joinThread) noexcept{
     _stopRequested = true;
+    _reconnectRequested = false;
     _state = State::Stopping;
-    cleanupConnection();
+    _wakeCv.notify_all();
     if (joinThread && _worker.joinable()) {
         _worker.join();
         _started = false;
     }
+}
+
+void WIFIConnectionSession::notifyDiscoveryUpdate(uint64_t version, bool reconnectNeeded) noexcept{
+    _pendingDiscoveryVersion = version;
+    if (reconnectNeeded) {
+        _reconnectRequested = true;
+    }
+    _wakeCv.notify_all();
 }
 
 WIFIConnectionSession::State WIFIConnectionSession::state() const noexcept{

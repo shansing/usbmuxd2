@@ -24,7 +24,7 @@
 #if defined(HAVE_WIFI_AVAHI) || defined(HAVE_WIFI_MDNS)
 
 WIFIDevice::WIFIDevice(Muxer *mux, WIFIDeviceManager *parent, std::string uuid, std::vector<std::string> ipaddr, std::string serviceName, uint32_t interfaceIndex)
-: Device(mux,Device::MUXCONN_WIFI), _parent(parent), _ipaddr(ipaddr), _serviceName(serviceName), _interfaceIndex(interfaceIndex), _session(nullptr), _rediscoverOnDestruct(true)
+: Device(mux,Device::MUXCONN_WIFI), _parent(parent), _ipaddr(ipaddr), _serviceName(serviceName), _interfaceIndex(interfaceIndex), _discoveryVersion(1), _session(nullptr), _rediscoverOnDestruct(true)
 {
     strncpy(_serial, uuid.c_str(), sizeof(_serial));
 }
@@ -44,15 +44,29 @@ bool WIFIDevice::isPairingDevice() const noexcept{
     return strncmp(_serial, "WIFIPAIR", sizeof("WIFIPAIR")-1) == 0;
 }
 
+WIFIDevice::DiscoveryInfo WIFIDevice::snapshotDiscoveryInfo() const{
+    std::lock_guard<std::mutex> lg(_sessionLck);
+    return DiscoveryInfo{
+        .ipaddr = _ipaddr,
+        .serviceName = _serviceName,
+        .interfaceIndex = _interfaceIndex,
+        .version = _discoveryVersion.load()
+    };
+}
+
 void WIFIDevice::ensureSession(){
     if (isPairingDevice()) {
         return;
     }
-    std::lock_guard<std::mutex> lg(_sessionLck);
-    if (!_session) {
-        _session = std::make_shared<WIFIConnectionSession>(_selfref.lock());
+    std::shared_ptr<WIFIConnectionSession> session;
+    {
+        std::lock_guard<std::mutex> lg(_sessionLck);
+        if (!_session) {
+            _session = std::make_shared<WIFIConnectionSession>(_selfref.lock());
+        }
+        session = _session;
     }
-    _session->start();
+    session->start();
 }
 
 void WIFIDevice::stopSession(bool joinThread) noexcept{
@@ -68,10 +82,25 @@ void WIFIDevice::stopSession(bool joinThread) noexcept{
 }
 
 void WIFIDevice::updateDiscoveryInfo(std::vector<std::string> ipaddr, std::string serviceName, uint32_t interfaceIndex){
-    std::lock_guard<std::mutex> lg(_sessionLck);
-    _ipaddr = std::move(ipaddr);
-    _serviceName = std::move(serviceName);
-    _interfaceIndex = interfaceIndex;
+    std::shared_ptr<WIFIConnectionSession> session;
+    bool changed = false;
+    uint64_t newVersion = 0;
+    {
+        std::lock_guard<std::mutex> lg(_sessionLck);
+        changed = (_ipaddr != ipaddr) || (_serviceName != serviceName) || (_interfaceIndex != interfaceIndex);
+        _ipaddr = std::move(ipaddr);
+        _serviceName = std::move(serviceName);
+        _interfaceIndex = interfaceIndex;
+        if (changed) {
+            newVersion = _discoveryVersion.fetch_add(1) + 1;
+        } else {
+            newVersion = _discoveryVersion.load();
+        }
+        session = _session;
+    }
+    if (session) {
+        session->notifyDiscoveryUpdate(newVersion, changed);
+    }
 }
 
 void WIFIDevice::setRediscoverOnDestruct(bool enabled) noexcept{

@@ -11,6 +11,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <memory>
 #include <mutex>
 #include <thread>
@@ -33,8 +34,13 @@ private:
     std::weak_ptr<WIFIDevice> _device;
     std::thread _worker;
     std::mutex _stateLck;
+    std::mutex _wakeLck;
+    std::condition_variable _wakeCv;
     std::atomic<bool> _stopRequested;
     std::atomic<bool> _started;
+    std::atomic<bool> _reconnectRequested;
+    std::atomic<uint64_t> _pendingDiscoveryVersion;
+    uint64_t _appliedDiscoveryVersion;
     std::atomic<State> _state;
     idevice_t _idev;
     heartbeat_client_t _hbclient;
@@ -50,6 +56,7 @@ public:
 
     void start();
     void stop(bool joinThread = true) noexcept;
+    void notifyDiscoveryUpdate(uint64_t version, bool reconnectNeeded) noexcept;
     State state() const noexcept;
     bool hasHeartbeat() const noexcept;
     heartbeat_client_t heartbeatClient() const noexcept;
