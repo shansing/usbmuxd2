@@ -55,6 +55,7 @@ public:
     void delete_device(uint8_t bus, uint8_t address) noexcept;
     void delete_wifi_pairing_device_with_ip(std::vector<std::string> ipaddrs) noexcept;
     void delete_wifi_device_with_serial(const std::string &serial) noexcept;
+    void cleanup_wifi_device_after_unpair(const std::string &serial) noexcept;
     std::shared_ptr<WIFIDevice> get_wifi_device_with_serial(const std::string &serial) noexcept;
     bool have_usb_device(uint8_t bus, uint8_t address) noexcept;
     bool have_wifi_device_with_mac(std::string macaddr) noexcept;

@@ -167,7 +167,7 @@ void Muxer::add_device(std::shared_ptr<Device> dev, bool notify) noexcept {
         }
     }
 #endif //defined(HAVE_WIFI_AVAHI) || defined(HAVE_WIFI_MDNS)
-    
+
 #ifdef HAVE_LIBIMOBILEDEVICE
     if (dev->_conntype == Device::MUXCONN_USB && _doPreflight){
         try {
@@ -177,7 +177,7 @@ void Muxer::add_device(std::shared_ptr<Device> dev, bool notify) noexcept {
         }
     }
 #endif //HAVE_LIBIMOBILEDEVICE
-    
+
     if (notify) notify_device_add(dev);
 }
 
@@ -245,6 +245,20 @@ void Muxer::delete_wifi_device_with_serial(const std::string &serial) noexcept{
     if (devid != INVALID_ID) {
         notify_device_remove(devid);
     }
+#endif //defined(HAVE_WIFI_AVAHI) || defined(HAVE_WIFI_MDNS)
+}
+
+void Muxer::cleanup_wifi_device_after_unpair(const std::string &serial) noexcept{
+#if defined(HAVE_WIFI_AVAHI) || defined(HAVE_WIFI_MDNS)
+    auto dev = get_wifi_device_with_serial(serial);
+    if (!dev) {
+        debug("No existing wifi device found for unpaired serial=%s", serial.c_str());
+        return;
+    }
+
+    warning("Cleaning up wifi device after unpair serial=%s", serial.c_str());
+    dev->setRediscoverOnDestruct(false);
+    dev->kill();
 #endif //defined(HAVE_WIFI_AVAHI) || defined(HAVE_WIFI_MDNS)
 }
 
@@ -424,11 +438,11 @@ void Muxer::notify_device_remove(int deviceID) noexcept{
     cleanup([&]{
         safeFreeCustom(p_rsp, plist_free);
     });
-    
+
     p_rsp = plist_new_dict();
     plist_dict_set_item(p_rsp, "MessageType", plist_new_string("Detached"));
     plist_dict_set_item(p_rsp, "DeviceID", plist_new_uint(deviceID));
-    
+
     {
         guardRead(_clientsGuard);
         for (auto c : _clients){
@@ -481,7 +495,7 @@ void Muxer::notify_alldevices(std::shared_ptr<Client> cli) noexcept {
         error("notify_alldevices called on a client which is not listening");
         return;
     }
-    
+
     {
         guardRead(_devicesGuard);
         for (auto &d : _devices){

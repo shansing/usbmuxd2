@@ -51,7 +51,7 @@ Client::~Client(){
         _parent->_childrenEvent.notifyAll();
         _parent = NULL;
     }
-    
+
     safeClose(_fd);
     safeFree(_recvbuffer);
 }
@@ -337,6 +337,7 @@ void Client::processData(const usbmuxd_header *hdr){
                     return;
                 }
                 sysconf_remove_device_record(record_id.c_str());
+                _mux->cleanup_wifi_device_after_unpair(record_id.c_str());
                 send_result(hdr->tag, RESULT_OK);
                 return;
             }else if (message == "ListListeners") {
