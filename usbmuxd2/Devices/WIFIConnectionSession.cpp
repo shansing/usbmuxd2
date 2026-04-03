@@ -233,6 +233,11 @@ void WIFIConnectionSession::stop(bool joinThread) noexcept{
     }
 }
 
+void WIFIConnectionSession::requestReconnectNow() noexcept{
+    _reconnectRequested = true;
+    _wakeCv.notify_all();
+}
+
 void WIFIConnectionSession::notifyDiscoveryUpdate(uint64_t version, bool reconnectNeeded) noexcept{
     _pendingDiscoveryVersion = version;
     if (reconnectNeeded) {

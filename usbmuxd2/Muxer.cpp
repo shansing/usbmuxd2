@@ -481,6 +481,27 @@ void Muxer::notify_device_paired(int deviceID) noexcept{
     }
 }
 
+void Muxer::refresh_wifi_discovery() noexcept{
+#if defined(HAVE_WIFI_AVAHI) || defined(HAVE_WIFI_MDNS)
+    if (_wifidevmgr) {
+        _wifidevmgr->request_manual_refresh();
+    }
+#endif //defined(HAVE_WIFI_AVAHI) || defined(HAVE_WIFI_MDNS)
+}
+
+void Muxer::reconnect_wifi_sessions_now() noexcept{
+#if defined(HAVE_WIFI_AVAHI) || defined(HAVE_WIFI_MDNS)
+    guardRead(_devicesGuard);
+    for (auto dev : _devices) {
+        if (dev->_conntype != Device::MUXCONN_WIFI) {
+            continue;
+        }
+        auto wifidev = std::static_pointer_cast<WIFIDevice>(dev);
+        wifidev->requestSessionReconnectNow();
+    }
+#endif //defined(HAVE_WIFI_AVAHI) || defined(HAVE_WIFI_MDNS)
+}
+
 void Muxer::trigger_wifi_rediscovery_after_pairing(const char *udid) noexcept{
 #if defined(HAVE_WIFI_AVAHI) || defined(HAVE_WIFI_MDNS)
     if (_wifidevmgr) {

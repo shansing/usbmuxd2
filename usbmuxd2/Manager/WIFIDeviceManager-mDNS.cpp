@@ -54,7 +54,7 @@ void getaddr_reply(DNSServiceRef sdRef, DNSServiceFlags flags, uint32_t interfac
         devmgr->request_restart();
         goto error;
     }
-    
+
     std::vector<std::string> &addrs = devmgr->_clientAddrs[sdRef];
 
     std::string ipaddr;
@@ -71,7 +71,7 @@ void getaddr_reply(DNSServiceRef sdRef, DNSServiceFlags flags, uint32_t interfac
         bool notifyadd = true;
         std::string serviceName = addrs.front();
         addrs.erase(addrs.begin());
-        
+
         std::string macAddr{serviceName.substr(0,serviceName.find("@"))};
         std::string uuid;
         if (strstr(serviceName.c_str(), "_remotepairing-manual-pairing._tcp")) {
@@ -95,7 +95,7 @@ void getaddr_reply(DNSServiceRef sdRef, DNSServiceFlags flags, uint32_t interfac
             devmgr->_mux->delete_wifi_pairing_device_with_ip(addrs);
             notifyadd = true;
         }
-    
+
         {
             std::shared_ptr<WIFIDevice> dev = nullptr;
             try{
@@ -106,7 +106,7 @@ void getaddr_reply(DNSServiceRef sdRef, DNSServiceFlags flags, uint32_t interfac
             }
         }
     }
-    
+
 error:
     if (!(flags & kDNSServiceFlagsMoreComing)) {
         devmgr->_clientAddrs.erase(sdRef);
@@ -134,15 +134,15 @@ void resolve_reply(DNSServiceRef sdRef, DNSServiceFlags flags, uint32_t interfac
     }
 
     cassure(!(res = DNSServiceGetAddrInfo(&resolvClient, 0, kDNSServiceInterfaceIndexAny, kDNSServiceProtocol_IPv4 | kDNSServiceProtocol_IPv6, hosttarget, getaddr_reply, context)));
-    
+
     cassure((resolvfd = DNSServiceRefSockFD(resolvClient))>0);
 
     devmgr->_clientAddrs[resolvClient] = {fullname};
-    
+
     devmgr->_resolveClients.push_back(resolvClient);
     devmgr->_linkedClients[resolvClient] = sdRef;
     devmgr->rebuild_pollfds();
-    
+
 error:
     if (err) {
         error("resolve_reply failed with error=%d",err);
@@ -171,11 +171,11 @@ void browse_reply(DNSServiceRef sdref, const DNSServiceFlags flags, uint32_t ifI
         }
         return;
     }
-    
+
     const char *op = (flags & kDNSServiceFlagsAdd) ? "Add" : "Rmv";
     debug("%s %8X %3d %-20s %-20s %s",
            op, flags, ifIndex, replyDomain, replyType, replyName);
-    
+
     cassure(!(res = DNSServiceResolve(&resolvClient, 0, kDNSServiceInterfaceIndexAny, replyName, replyType, replyDomain, resolve_reply, context)));
 
     cassure((resolvfd = DNSServiceRefSockFD(resolvClient))>0);
@@ -199,7 +199,7 @@ WIFIDeviceManager::WIFIDeviceManager(Muxer *mux)
 {
     debug("WIFIDeviceManager mDNS-client");
     init_mdns();
-    
+
     _devReaperThread = std::thread([this]{
         reaper_runloop();
     });
@@ -408,6 +408,15 @@ void WIFIDeviceManager::request_restart() noexcept{
         char wake = 'r';
         (void)write(_wakePipe[1], &wake, 1);
     }
+}
+
+void WIFIDeviceManager::request_manual_refresh() noexcept{
+    if (_isStopping) {
+        debug("Ignoring mDNS manual refresh during shutdown");
+        return;
+    }
+    warning("WIFIDeviceManager manual mDNS refresh requested");
+    request_restart();
 }
 
 void WIFIDeviceManager::request_rediscovery_after_pairing(const char *udid) noexcept{

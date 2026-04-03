@@ -56,6 +56,7 @@ public:
 
     void start();
     void stop(bool joinThread = true) noexcept;
+    void requestReconnectNow() noexcept;
     void notifyDiscoveryUpdate(uint64_t version, bool reconnectNeeded) noexcept;
     State state() const noexcept;
     bool hasHeartbeat() const noexcept;

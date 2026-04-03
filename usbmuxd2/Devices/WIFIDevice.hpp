@@ -52,6 +52,7 @@ public:
     void startLoop();
     void ensureSession();
     void stopSession(bool joinThread = true) noexcept;
+    void requestSessionReconnectNow() noexcept;
     void updateDiscoveryInfo(std::vector<std::string> ipaddr, std::string serviceName, uint32_t interfaceIndex);
     void setRediscoverOnDestruct(bool enabled) noexcept;
     virtual void start_connect(uint16_t dport, std::shared_ptr<Client> cli) override;

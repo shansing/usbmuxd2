@@ -81,6 +81,24 @@ void WIFIDevice::stopSession(bool joinThread) noexcept{
     }
 }
 
+void WIFIDevice::requestSessionReconnectNow() noexcept{
+    if (isPairingDevice()) {
+        return;
+    }
+    std::shared_ptr<WIFIConnectionSession> session;
+    {
+        std::lock_guard<std::mutex> lg(_sessionLck);
+        if (!_session) {
+            _session = std::make_shared<WIFIConnectionSession>(_selfref.lock());
+        }
+        session = _session;
+    }
+    if (session) {
+        session->start();
+        session->requestReconnectNow();
+    }
+}
+
 void WIFIDevice::updateDiscoveryInfo(std::vector<std::string> ipaddr, std::string serviceName, uint32_t interfaceIndex){
     std::shared_ptr<WIFIConnectionSession> session;
     bool changed = false;

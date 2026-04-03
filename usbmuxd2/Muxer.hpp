@@ -72,6 +72,8 @@ public:
     void notify_device_add(std::shared_ptr<Device> dev) noexcept;
     void notify_device_remove(int deviceID) noexcept;
     void notify_device_paired(int deviceID) noexcept;
+    void refresh_wifi_discovery() noexcept;
+    void reconnect_wifi_sessions_now() noexcept;
     void trigger_wifi_rediscovery_after_pairing(const char *udid) noexcept;
     void notify_alldevices(std::shared_ptr<Client> cli) noexcept;
 

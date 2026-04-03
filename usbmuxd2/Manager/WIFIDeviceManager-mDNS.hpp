@@ -26,7 +26,7 @@ extern "C"{
     typedef uint32_t DNSServiceProtocol;
     typedef int32_t DNSServiceErrorType;
     typedef struct _DNSServiceRef_t *DNSServiceRef;
-    
+
     typedef void (*DNSServiceBrowseReply)(
         DNSServiceRef sdRef,
         DNSServiceFlags flags,
@@ -60,7 +60,7 @@ extern "C"{
         uint32_t ttl,
         void *context
     );
-    
+
     DNSServiceErrorType DNSServiceBrowse(
         DNSServiceRef          *sdRef,
         DNSServiceFlags        flags,
@@ -102,7 +102,7 @@ private:
     tihmstar::Event _childrenEvent;
     std::thread _devReaperThread;
     tihmstar::DeliveryEvent<std::shared_ptr<WIFIDevice>> _reapDevices;
-    
+
     DNSServiceRef _client;
     DNSServiceRef _clientPairing;
     int _dns_sd_fd;
@@ -128,11 +128,12 @@ private:
 public:
     WIFIDeviceManager(Muxer *mux);
     virtual ~WIFIDeviceManager() override;
-        
+
     void device_add(std::shared_ptr<WIFIDevice> dev, bool notify = true);
+    void request_manual_refresh() noexcept;
     void request_device_rediscovery(const char *serial, const char *serviceName) noexcept;
     void request_rediscovery_after_pairing(const char *udid) noexcept;
-    
+
     friend WIFIDevice;
     friend void browse_reply(DNSServiceRef sdref, const DNSServiceFlags flags, uint32_t ifIndex, DNSServiceErrorType errorCode, const char *replyName, const char *replyType, const char *replyDomain, void *context) noexcept;
     friend void resolve_reply(DNSServiceRef sdRef, DNSServiceFlags flags, uint32_t interfaceIndex, DNSServiceErrorType errorCode, const char*fullname, const char*hosttarget, uint16_t port, uint16_t txtLen, const unsigned char*txtRecord, void*context) noexcept;

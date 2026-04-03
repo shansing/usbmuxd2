@@ -158,6 +158,15 @@ void WIFIDeviceManager::request_restart() noexcept{
     }
 }
 
+void WIFIDeviceManager::request_manual_refresh() noexcept{
+    if (_isStopping) {
+        debug("Ignoring avahi manual refresh during shutdown");
+        return;
+    }
+    warning("WIFIDeviceManager manual avahi refresh requested");
+    request_restart();
+}
+
 void WIFIDeviceManager::request_rediscovery_after_pairing(const char *udid) noexcept{
     if (_isStopping) {
         debug("Ignoring avahi rediscovery-after-pairing request during shutdown udid=%s", udid ? udid : "<null>");

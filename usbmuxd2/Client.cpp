@@ -340,6 +340,11 @@ void Client::processData(const usbmuxd_header *hdr){
                 _mux->cleanup_wifi_device_after_unpair(record_id.c_str());
                 send_result(hdr->tag, RESULT_OK);
                 return;
+            } else if (message == "RefreshWifiDiscovery") {
+                _mux->refresh_wifi_discovery();
+                _mux->reconnect_wifi_sessions_now();
+                send_result(hdr->tag, RESULT_OK);
+                return;
             }else if (message == "ListListeners") {
                 _mux->send_listenerList(_selfref.lock(), hdr->tag);
                 return;

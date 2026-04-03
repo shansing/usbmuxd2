@@ -50,6 +50,7 @@ public:
     virtual ~WIFIDeviceManager() override;
 
     void device_add(std::shared_ptr<WIFIDevice> dev, bool notify = true);
+    void request_manual_refresh() noexcept;
     void request_device_rediscovery(const char *serial, const char *serviceName) noexcept;
     void request_rediscovery_after_pairing(const char *udid) noexcept;
 
